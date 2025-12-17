@@ -8,7 +8,7 @@
    ```bash
    pip install ultralytics opencv-python playsound requests
    ```
-3. Siapkan file berikut dalam satu folder:
+3. Siapkan file berikut dalam satu folder (untuk YOLO akan terinstall sendiri setelah install requirements):
 
    ```
    ├── main.py
