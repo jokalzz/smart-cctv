@@ -11,7 +11,7 @@
 3. Siapkan file berikut dalam satu folder (untuk YOLO akan terinstall sendiri setelah install requirements):
 
    ```
-   ├── main.py
+   ├── cctv.py
    ├── yolov8s-world.pt
    ├── yolov8n-pose.pt
    ├── alarm.wav
@@ -20,7 +20,7 @@
 4. Jalankan program:
 
    ```bash
-   python main.py
+   python cctv.py
    ```
 5. Tekan **Q** untuk keluar dari aplikasi
 
