@@ -1,6 +1,6 @@
-# 📷 Smart CCTV – YOLO + Pose (Deteksi Manusia & Hewan)
+# Smart CCTV – YOLO + Pose (Deteksi Manusia & Hewan)
 
-## ▶️ Cara Menggunakan (WAJIB DIBACA)
+## Cara Menggunakan (WAJIB DIBACA)
 
 1. Pastikan **Python 3.8 – 3.11** sudah terinstall
 2. Install library yang dibutuhkan:
@@ -26,7 +26,7 @@
 
 ---
 
-## 📌 Fungsi Program
+## Fungsi Program
 
 Program ini adalah **Smart CCTV berbasis AI** untuk:
 
@@ -39,7 +39,7 @@ Program ini adalah **Smart CCTV berbasis AI** untuk:
 
 ---
 
-## 🧠 Cara Kerja Singkat
+## Cara Kerja Singkat
 
 1. Kamera menangkap video
 2. YOLO mendeteksi objek (manusia / hewan)
@@ -59,7 +59,7 @@ Program ini adalah **Smart CCTV berbasis AI** untuk:
 
 ---
 
-## 🔔 Alarm & Anti Spam
+## Alarm & Anti Spam
 
 * Alarm aktif jika hewan muncul **≥ 3 frame berturut-turut**
 * Delay alarm: **10 detik**
@@ -67,7 +67,7 @@ Program ini adalah **Smart CCTV berbasis AI** untuk:
 
 ---
 
-## 📩 Telegram
+## Telegram
 
 Edit token dan chat ID:
 
@@ -80,14 +80,14 @@ Telegram akan menerima **foto + nama hewan + waktu**.
 
 ---
 
-## 📂 Output
+## Output
 
 * `snapshots/` → foto hasil deteksi
 * `riwayat_deteksi.txt` → log kejadian
 
 ---
 
-## 📝 Catatan
+## Catatan
 
 * Gunakan kamera posisi tetap
 * Pencahayaan cukup agar deteksi stabil
