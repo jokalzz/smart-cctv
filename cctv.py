@@ -26,7 +26,7 @@ detector.set_classes([
 # ======================================
 # CONFIG
 # ======================================
-FRAME_W, FRAME_H = 640, 480
+FRAME_W, FRAME_H = 1280, 720
 POSE_INTERVAL = 5
 MIN_OBJ_AREA_RATIO = 0.15
 MIN_KEYPOINTS = 8
@@ -84,7 +84,12 @@ def send_telegram_snapshot(image_path, caption):
 # ======================================
 # CAMERA
 # ======================================
-cap = cv2.VideoCapture(0)
+# untuk webcam pake ini:
+# cap = cv2.VideoCapture(0)
+
+# untuk cctv pake ini RTSP dibawah sampai cap
+RTSP_URL = "rtsp://admin:hikvision12@192.168.1.65:554/Streaming/Channels/101"
+cap = cv2.VideoCapture(RTSP_URL)
 prev_time = 0
 frame_count = 0
 
