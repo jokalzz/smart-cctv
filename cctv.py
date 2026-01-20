@@ -2,6 +2,7 @@ import cv2
 import time
 import os
 import requests
+import numpy as np
 from ultralytics import YOLO
 from playsound import playsound
 from datetime import datetime
@@ -9,41 +10,51 @@ from datetime import datetime
 # ======================================
 # LOAD MODELS
 # ======================================
-detector = YOLO("yolov8s-world.pt")
-pose_model = YOLO("yolov8n-pose.pt")
+detector = YOLO("yolov8s-world.pt").to("cuda")
+pose_model = YOLO("yolov8n-pose.pt").to("cuda")
+custom_model = YOLO("best.pt").to("cuda")
 
+
+# Detector YOLO - hanya kucing dan burung
 detector.set_classes([
-    "person",
-    "cat",
-    "dog",
-    "snake",
-    "chicken",
-    "bird",
-    "cow",
-    "goat"
+    "kucing",
+    "burung"
 ])
+
+# Custom model configuration - hanya ular dan biawak
+CUSTOM_MODEL_CLASSES = ["ular", "biawak"]
+CUSTOM_MODEL_THRESHOLDS = {"ular": 25, "biawak": 25}
 
 # ======================================
 # CONFIG
 # ======================================
-FRAME_W, FRAME_H = 1280, 720
-POSE_INTERVAL = 5
-MIN_OBJ_AREA_RATIO = 0.15
+FRAME_W, FRAME_H = 640, 360
+SKIP_FRAMES = 8  # Jalankan deteksi setiap 5 frame untuk mengurangi beban
+POSE_INTERVAL = 8
+MIN_OBJ_AREA_RATIO = 0.05
 MIN_KEYPOINTS = 8
 MIN_ASPECT_RATIO = 1.2
-MIN_ANIMAL_CONFIDENCE = 65  # persen
+MIN_ANIMAL_CONFIDENCE = 30  # persen
 
-STRONG_ANIMALS = ["dog", "cat", "snake", "bird", "chicken"]
+# Per-class confidence thresholds
+ALARM_THRESHOLDS = {
+    "kucing": 30,      # Kucing: 30%
+    "burung": 30,     # Burung: 30%
+    "ular": 25,     # Ular: 25%
+    "biawak": 25    # Biawak: 25%
+}
 
-ALARM_DELAY = 10
-SNAPSHOT_DELAY = 10
+STRONG_ANIMALS = ["kucing", "burung", "ular", "biawak"]
+
+ALARM_DELAY = 5
+SNAPSHOT_DELAY = 5
 
 last_alarm = 0
 last_snapshot = 0
 animal_counter = 0
 
-TELEGRAM_BOT_TOKEN = "8554115860:AAEBbgxKhM_nea38VkNDImzaHG3Z9cM9hvc"
-TELEGRAM_CHAT_ID = "1368725503"
+TELEGRAM_BOT_TOKEN = "input_your_bot_token_here"
+TELEGRAM_CHAT_ID = "input_your_chat_id_here"
 
 # ======================================
 # SNAPSHOT CONFIG
@@ -51,51 +62,142 @@ TELEGRAM_CHAT_ID = "1368725503"
 SNAPSHOT_DIR = "snapshots"
 os.makedirs(SNAPSHOT_DIR, exist_ok=True)
 
-def save_snapshot(frame, detected_animals):
+def save_snapshot(frame, animals_dict):
     timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
     filename = f"{SNAPSHOT_DIR}/animal_{timestamp}.jpg"
     cv2.imwrite(filename, frame)
 
-    animals_text = ", ".join(detected_animals)
-    caption = f"🚨 HEWAN TERDETEKSI 🚨\n{animals_text}\n🕒 {timestamp}"
+    # Format dengan persentase
+    animals_detail = "\n".join([f"  • {k}: <b>{v:.1f}%</b>" for k, v in animals_dict.items()])
 
-    send_telegram_snapshot(filename, caption)
+    caption = (
+        f"{animals_detail}\n"
+        f"<b>Waktu:</b> {timestamp}"
+    )
 
+    log_file = "riwayat_deteksi.txt"
+    print(f"[ALARM] Snapshot + Log → Telegram | Hewan: {list(animals_dict.keys())}")
+    send_telegram_snapshot(filename, caption, log_file)
 
-def send_telegram_snapshot(image_path, caption):
-    url = f"https://api.telegram.org/bot8554115860:AAEBbgxKhM_nea38VkNDImzaHG3Z9cM9hvc/sendPhoto"
+def send_telegram_snapshot(image_path, caption, log_file=None):
+    """Send photo with caption and optionally attach log file"""
+    url_photo = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendPhoto"
+    url_doc = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendDocument"
 
-    with open(image_path, "rb") as img:
-        files = {
-            "photo": img
-        }
+    try:
+        with open(image_path, "rb") as img:
+            r = requests.post(
+                url_photo,
+                files={"photo": img},
+                data={
+                    "chat_id": TELEGRAM_CHAT_ID,
+                    "caption": caption,
+                    "parse_mode": "HTML"
+                },
+                timeout=10
+            )
+        print(f"[TELEGRAM Photo] Status: {r.status_code}")
+    except Exception as e:
+        print(f"[ERROR] Telegram Photo: {e}")
 
-        data = {
-            "chat_id": TELEGRAM_CHAT_ID,
-            "caption": caption,  
-            "parse_mode": "HTML"  
-        }
+    # Send log file if exists
+    if log_file and os.path.exists(log_file):
+        try:
+            with open(log_file, "rb") as doc:
+                r2 = requests.post(
+                    url_doc,
+                    files={"document": doc},
+                    data={"chat_id": TELEGRAM_CHAT_ID},
+                    timeout=10
+                )
+            print(f"[TELEGRAM Document] Status: {r2.status_code}")
+        except Exception as e:
+            print(f"[ERROR] Telegram Document: {e}")
 
-        response = requests.post(url, files=files, data=data)
-
-        if response.status_code != 200:
-            print("TELEGRAM ERROR:", response.text)
-
+# local camera:
+cap = cv2.VideoCapture(0)
 # ======================================
-# CAMERA
+# CCTV
 # ======================================
-# untuk webcam pake ini:
-# cap = cv2.VideoCapture(0)
+# RTSP_URL = "rtsp://admin:hikvision12@192.168.1.68:554/Streaming/Channels/102"
+# cap = cv2.VideoCapture(RTSP_URL)
 
-# untuk cctv pake ini RTSP dibawah sampai cap
-RTSP_URL = "rtsp://admin:hikvision12@192.168.1.65:554/Streaming/Channels/101"
-cap = cv2.VideoCapture(RTSP_URL)
 prev_time = 0
 frame_count = 0
 
-detected_animals = set()
-detected_animals_frame = []
+detected_animals = {}  # { "KUCING": 85.5 }
 
+# ======================================
+# DETECTION HANDLER
+# ======================================
+def process_detections(results, names, frame, frame_area, allowed_classes=None):
+    """Process model results dan cek threshold per kelas
+    
+    Args:
+        allowed_classes: List of class names to process. If None, process all.
+    """
+    found = False
+    allowed_lc = [c.lower() for c in allowed_classes] if allowed_classes else None
+    
+    for r in results:
+        for box in r.boxes:
+            cls_name = names[int(box.cls[0])]
+            cls_lc = cls_name.lower()
+            confidence = float(box.conf[0]) * 100
+
+            # Filter classes jika ada allowed_classes
+            if allowed_lc and cls_lc not in allowed_lc:
+                continue
+
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            w = x2 - x1
+            h = y2 - y1
+            obj_area = w * h
+            aspect_ratio = h / w if w != 0 else 0
+
+            if obj_area / frame_area < 0.05:
+                continue
+
+            # Anti-false human (untuk kelas yang bukan STRONG_ANIMALS)
+            is_human = False
+            if cls_lc not in STRONG_ANIMALS:
+                if (
+                    frame_count % POSE_INTERVAL == 0 and
+                    obj_area / frame_area >= MIN_OBJ_AREA_RATIO and
+                    aspect_ratio >= MIN_ASPECT_RATIO
+                ):
+                    crop = frame[y1:y2, x1:x2]
+                    if crop.size > 0:
+                        pose_results = pose_model(crop, conf=0.3)
+                        for pr in pose_results:
+                            if pr.keypoints is not None:
+                                kpts = pr.keypoints.xy[0]
+                                visible = sum(
+                                    1 for x, y in kpts if x > 0 and y > 0
+                                )
+                                if visible >= MIN_KEYPOINTS:
+                                    is_human = True
+
+            if is_human:
+                continue
+
+            # Cek threshold per kelas dari ALARM_THRESHOLDS
+            threshold = ALARM_THRESHOLDS.get(cls_lc, MIN_ANIMAL_CONFIDENCE)
+
+            if confidence >= threshold:
+                key = cls_name.upper()
+                if key not in detected_animals or confidence > detected_animals[key]:
+                    detected_animals[key] = confidence
+                found = True
+
+            # DRAW
+            label = f"{cls_name.upper()} {confidence:.1f}%"
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 0, 255), 2)
+            cv2.putText(frame, label, (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+
+    return found
 
 # ======================================
 # MAIN LOOP
@@ -114,101 +216,48 @@ while True:
     fps = 1 / (curr_time - prev_time) if prev_time else 0
     prev_time = curr_time
 
-    results = detector(frame, conf=0.25)
+    # Run detections (setiap SKIP_FRAMES untuk mengurangi beban GPU)
+    if frame_count % SKIP_FRAMES == 0:
+        det_results = detector(frame, conf=0.25)
+        custom_results = custom_model(frame, conf=0.25)
+    else:
+        det_results = []
+        custom_results = []
+
     animal_detected_this_frame = False
 
-    for r in results:
-        for box in r.boxes:
-            cls_name = detector.names[int(box.cls[0])]
-            x1, y1, x2, y2 = map(int, box.xyxy[0])
+    # Process YOLO results (kucing, burung HANYA dari YOLO)
+    if det_results:
+        animal_detected_this_frame |= process_detections(det_results, detector.names, frame, frame_area)
 
-            w = x2 - x1
-            h = y2 - y1
-            obj_area = w * h
-            aspect_ratio = h / w if w != 0 else 0
-
-            # Skip objek terlalu kecil
-
-            if cls_name != "person" and obj_area / frame_area < 0.05:
-                continue
-            
-            is_human = False
-
-            confidence = float(box.conf[0]) * 100  # jadi persen
-            
-            if cls_name == "person" and confidence < 30:
-                continue
-            # ======================================
-            # PERSON → MANUSIA
-            # ======================================
-            if cls_name == "person":
-                is_human = True
-
-            # ======================================
-            # HEWAN → VERIFIKASI POSE
-            # ======================================
-            else:
-                if cls_name in STRONG_ANIMALS:
-                    is_human = False
-                else:
-                    if (
-                        frame_count % POSE_INTERVAL == 0 and
-                        obj_area / frame_area >= MIN_OBJ_AREA_RATIO and
-                        aspect_ratio >= MIN_ASPECT_RATIO
-                    ):
-                        crop = frame[y1:y2, x1:x2]
-                        if crop.size > 0:
-                            pose_results = pose_model(crop, conf=0.3)
-                            for pr in pose_results:
-                                if pr.keypoints is not None:
-                                    kpts = pr.keypoints.xy[0]
-                                    visible = sum(
-                                        1 for x, y in kpts if x > 0 and y > 0
-                                    )
-                                    if visible >= MIN_KEYPOINTS:
-                                        is_human = True
-
-            # ======================================
-            # DRAW
-            # ======================================
-            if is_human:
-                color = (0, 255, 0)
-                label = f"Manusia {confidence:.1f}%"
-            else:
-                color = (0, 0, 255)
-                label = f"{cls_name.upper()} {confidence:.1f}%"
-                
-                if confidence >= MIN_ANIMAL_CONFIDENCE:
-                    animal_detected_this_frame = True
-                    detected_animals.add(label)
-                    detected_animals_frame.append(cls_name)
-
-            cv2.rectangle(frame, (x1, y1), (x2, y2), color, 2)
-            cv2.putText(frame, label, (x1, y1 - 10),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.8, color, 2)
+    # Process custom model results (ular, biawak HANYA dari best.pt)
+    if custom_results:
+        animal_detected_this_frame |= process_detections(custom_results, custom_model.names, frame, frame_area, 
+                                                         allowed_classes=CUSTOM_MODEL_CLASSES)
 
     # ======================================
-    # ALARM + SNAPSHOT (ANTI SPAM)
+    # ALARM + SNAPSHOT
     # ======================================
     if animal_detected_this_frame:
         animal_counter += 1
     else:
         animal_counter = 0
 
-    if animal_counter >= 3 and time.time() - last_alarm > ALARM_DELAY:
+    if animal_counter >= 1 and time.time() - last_alarm > ALARM_DELAY:
         playsound("alarm.wav", block=False)
 
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        with open("riwayat_deteksi.txt", "a") as f:
-            for animal in detected_animals:
-                f.write(f"[{now}] {animal}\n")
-        detected_animals.clear()
 
-        # SIMPAN SNAPSHOT
+        with open("riwayat_deteksi.txt", "a") as f:
+            f.write(f"\n[{now}]\n")
+            for animal, conf in detected_animals.items():
+                f.write(f"  {animal}: {conf:.1f}%\n")
+
         if time.time() - last_snapshot > SNAPSHOT_DELAY:
             save_snapshot(frame, detected_animals)
             last_snapshot = time.time()
 
+        detected_animals.clear()
         last_alarm = time.time()
 
     # ======================================
@@ -217,7 +266,7 @@ while True:
     cv2.putText(frame, f"FPS: {int(fps)}", (20, 40),
                 cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 0), 2)
 
-    cv2.imshow("SMART CCTV YOLO + POSE", frame)
+    cv2.imshow("CCTV 1", frame)
 
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
