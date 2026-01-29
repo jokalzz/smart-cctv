@@ -1,7 +1,22 @@
+# Requirements for this project.
+# For machines WITHOUT a dedicated GPU (CPU-only), install PyTorch CPU wheels first:
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+# Then install the remaining packages below (this file):
+
 ultralytics
-torch
-torchvision
 opencv-python
 playsound
 requests
 numpy
+
+# NOTE: `torch` and `torchvision` are required for the full YOLO version but
+# must be installed separately via the PyTorch index (CPU or CUDA). Do not
+# rely on pip to auto-select the correct large wheel.
+
+# Langkah-langkah instalasi berdasarkan jenis perangkat keras (lakukan ini di terminal):
+# CPU-only:
+# pip install --index-url https://download.pytorch.org/whl/cpu torch torchvision
+# GPU (contoh CUDA 11.8 — sesuaikan):
+# pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision
+# Lalu:
+# pip install -r requirements.txt

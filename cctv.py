@@ -1,4 +1,5 @@
 import cv2
+import torch
 import time
 import os
 import requests
@@ -10,9 +11,10 @@ from datetime import datetime
 # ======================================
 # LOAD MODELS
 # ======================================
-detector = YOLO("yolov8s-world.pt").to("cuda")
-pose_model = YOLO("yolov8n-pose.pt").to("cuda")
-custom_model = YOLO("best.pt").to("cuda")
+device = "cuda" if torch.cuda.is_available() else "cpu"
+detector = YOLO("yolov8s-world.pt").to(device)
+pose_model = YOLO("yolov8n-pose.pt").to(device)
+custom_model = YOLO("best.pt").to(device) 
 
 
 # Detector YOLO - hanya kucing dan burung
