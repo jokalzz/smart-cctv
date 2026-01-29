@@ -53,8 +53,8 @@ last_alarm = 0
 last_snapshot = 0
 animal_counter = 0
 
-TELEGRAM_BOT_TOKEN = "input_your_bot_token_here"
-TELEGRAM_CHAT_ID = "input_your_chat_id_here"
+TELEGRAM_BOT_TOKEN = "8554115860:AAEBbgxKhM_nea38VkNDImzaHG3Z9cM9hvc"
+TELEGRAM_CHAT_ID = "1368725503"
 
 # ======================================
 # SNAPSHOT CONFIG
